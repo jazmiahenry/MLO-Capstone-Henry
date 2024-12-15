@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 """Simulation for Manufacturing Line Optimization"""
-__author__ = "Amir Jafari, Hossein Khadivi Heris"
+__author__ = "Amir Jafari, Hossein Khadivi Heris, Jazmia Henry"
 __copyright__ = "Project Socrates, Professional Services"
-__credits__ = ["Amir Jafari", "Hossein Khadivi Heris"]
+__credits__ = ["Amir Jafari", "Hossein Khadivi Heris, Jazmia Henry"]
 __license__ = "Microsoft"
 __version__ = "1.0.1"
 __maintainer__ = "Amir Jafari"
@@ -10,11 +10,7 @@ __email__ = "amjafari@microsoft.com"
 __status__ = "Development"
 
 from textwrap import indent
-<<<<<<< HEAD
-from line_config import adj, adj_conv
-=======
-from .line_config import adj, adj_conv
->>>>>>> 6aa7bce (Updated sim, logs & integration)
+from sim.line_config import adj, adj_conv
 import json
 import os
 import time
@@ -98,36 +94,23 @@ class General:
     num_conveyor_bins = 10 # number of bins per conveyor
     bin_maximum_capacity = 100 # maximum capacity (in products) of each bin
     conveyor_capacity = bin_maximum_capacity * num_conveyor_bins  # in products
-<<<<<<< HEAD
     machine_min_speed = [100, 30, 60, 40, 80, 80, 100, 30, 60, 40, 80, 80]
-=======
-    machine_min_speed = [100, 30, 60,40, 80, 80, 100, 30, 60, 40, 80, 80]
->>>>>>> 6aa7bce (Updated sim, logs & integration)
     machine_max_speed = [170, 190, 180, 180, 180, 300, 170, 190, 180, 180, 180, 300]
     # initial speed of the machines
     machine0_initial_speed = 110
     machine1_initial_speed = 50
     machine2_initial_speed = 70
-<<<<<<< HEAD
     machine3_initial_speed = 70
-=======
-    machine3_initial_speed = 60
->>>>>>> 6aa7bce (Updated sim, logs & integration)
     machine4_initial_speed = 100
     machine5_initial_speed = 120
     machine6_initial_speed = 110
     machine7_initial_speed = 50
     machine8_initial_speed = 70
-<<<<<<< HEAD
     machine9_initial_speed = 70
-=======
-    machine9_initial_speed = 60
->>>>>>> 6aa7bce (Updated sim, logs & integration)
     machine10_initial_speed = 100
     machine11_initial_speed = 120
-    machine_initial_speed = [machine0_initial_speed, machine1_initial_speed, machine2_initial_speed, machine3_initial_speed,
-     machine4_initial_speed, machine5_initial_speed, machine6_initial_speed, machine7_initial_speed, machine8_initial_speed,
-     machine9_initial_speed, machine10_initial_speed, machine11_initial_speed]
+    machine_initial_speed = [machine0_initial_speed, machine1_initial_speed, machine2_initial_speed, machine3_initial_speed, machine4_initial_speed, machine5_initial_speed, 
+    machine6_initial_speed, machine7_initial_speed, machine8_initial_speed, machine9_initial_speed, machine10_initial_speed, machine11_initial_speed] # initial speed of the machines
     infeed_prox_upper_limit = 50 # threshold to turn on/off the infeed prox
     infeed_prox_lower_limit =  50 # threshold to turn on/off the infeed prox
     discharge_prox_upper_limit = 50 # threshold to turn on/off the discharge prox
@@ -221,6 +204,10 @@ class Conveyor(General):
     def state(self):
         return self._state
 
+    @property
+    def reward(self):
+        return self._reward
+
     @speed.setter
     def speed(self, value):
         if not (self.min_speed <= value <= self.max_speed or value == 0):
@@ -282,6 +269,7 @@ class DES(General):
         self.downtime_event_times_history = deque([0, 0, 0], maxlen=10)
         self.downtime_machine_history = deque([0, 0, 0], maxlen=10)
         self.control_frequency_history = deque([0, 0, 0], maxlen=10)
+        self.machine_speeds_history = deque([0, 0, 0], maxlen=10)
         self._initialize_downtime_tracker()
         self._check_simulation_step()
         self.sinks_throughput_abs = 0
@@ -545,6 +533,13 @@ class DES(General):
         track the control frequency
         '''
         self.control_frequency_history.append(self.env.now)
+
+    def track_machine_speeds(self):
+        '''
+        track the machine speeds
+        '''
+        self.machine_speeds_history.append(self.actual_speeds)
+
 
     def track_sinks_throughput(self):
         '''
@@ -963,6 +958,22 @@ class DES(General):
         # self.store_bin_levels()
         self.downtime_estimator()
 
+    def current_machine_speeds(self):
+        '''
+        determine the current machines' speeds based on conveyor levels
+        '''
+        self.current_speeds = {}
+        for machine in General.machine_list:
+            tmp = getattr(eval('self.' + machine), 'speed')
+            self.current_speeds[machine] = tmp
+        return self.current_speeds   
+
+    #def modular_machines(self):
+        #'''store machine's speeds regardless of machine number'''
+        #for machine in General.machine_list:
+            #self.actual_machine_speeds[i] = getattr(eval('self' + machine), 'speed')
+            #return self.actual_speeds
+
     def step(self, brain_actions):
         '''
         run through the simulator at each brain iteration step
@@ -971,16 +982,13 @@ class DES(General):
         # update the speed dictionary for those comming from the brain
         self.brain_speed = []
         for key in General.machine_list:
-<<<<<<< HEAD
             self.components_speed[key] = brain_actions.get(key, 0)
             self.brain_speed.append(brain_actions.get(key, 0))
-=======
-            self.components_speed[key] = brain_actions[key]
-            self.brain_speed.append(brain_actions[key])
->>>>>>> 6aa7bce (Updated sim, logs & integration)
         # using brain actions
         self.update_machines_speed()
         print('Simulation time at step:', self.env.now)
+        
+
 
         # step through the controllable event
         self.env.step()
@@ -1006,6 +1014,11 @@ class DES(General):
         self.track_control_frequency()
         # track product accumulation in sinks once a new control event is triggered.
         self.track_sinks_throughput()
+        # track current machine speeds
+        self.current_machine_speeds() # track the current machine speeds
+        # track the actual machine speeds
+    
+
 
     def get_states(self):
         '''
@@ -1294,11 +1307,7 @@ if __name__ == "__main__":
         "dischargeProx_index2": 3,
         "num_products_at_discharge_index1": 950 , 
         "num_products_at_discharge_index2": 650 ,
-<<<<<<< HEAD
         "num_products_at_infeed_index1": 350 ,  
-=======
-        "num_products_at_infeed_index2": 350 ,  
->>>>>>> 6aa7bce (Updated sim, logs & integration)
         "num_products_at_infeed_index2": 50 ,  
     }
     my_env.reset(default_config)
